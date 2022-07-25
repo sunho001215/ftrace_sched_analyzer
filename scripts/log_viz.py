@@ -3,6 +3,8 @@ import os
 import json
 import plotly.graph_objects as go
 import numpy as np
+import math
+from tqdm import tqdm
 from plotly.subplots import make_subplots
 
 
@@ -11,17 +13,21 @@ from plotly.subplots import make_subplots
 core_plot = [10, 11]
 # visualization mode ("per_thread" or "per_cpu")
 mode = 'per_cpu'
+# computtion speed ("fast" or "normal") -> normal will skip data little than 100ns
+speed = 'normal' 
 ####################################
 
 class CoreInfo:
     def __init__(self, core):
         self.core = core
-        self.min = -1
-        self.max = -1
+        self.min = math.inf
+        self.max = -math.inf
         self.processes = {}
         return
     
     def add(self, name, pid, start, end):
+        if speed == 'fast' and end-start < 0.001: return
+
         pid = str(pid)
         if pid not in self.processes:
             self.processes[pid] = {'name':[], 'start':[], 'end':[], 'len':[], 'label':[]}
@@ -29,11 +35,14 @@ class CoreInfo:
         self.processes[pid]['start'].append(start)
         self.processes[pid]['end'].append(end)
         self.processes[pid]['len'].append(end-start)
-        self.processes[pid]['label'].append('name: ' + name + ' / pid:' + str(pid) + ' / start:' + str(start) + ' / end:' + str(end))
+
+        self.processes[pid]['label'].append('name: ' + name + ' / pid:' + str(pid) + ' / len:'+ str(end-start) +' / start:' + str(start) + ' / end:' + str(end))
+
+        return
     
-    def update_min_max(self):        
+    def update_min_max(self):
         for pid in self.processes:
-            if self.min == -1:
+            if self.min == math.inf:
                 self.min = min(self.processes[pid]['start'])
                 self.max = max(self.processes[pid]['end'])
             else:
@@ -51,17 +60,16 @@ def load_data(data_path):
         for _, core in enumerate(cores):
             core_info = CoreInfo(core)
             core_data = raw_data[core]
-            
+
             for name in core_data:
-                for process_info in core_data[name]:                    
+                for process_info in core_data[name]:
                     pid = process_info['PID']
                     start = process_info['Start Time']
                     end = process_info['End Time']
                     core_info.add(name, pid, start, end)
-            
+
             core_info.update_min_max()
             core_info_data.append(core_info)
-    
     
     return core_info_data
 
@@ -77,17 +85,14 @@ def visualize_all_cores(core_info_data):
 
         fig = make_subplots(rows=len(core_plot), cols=1, subplot_titles=subplot_names)
     
-    ax_range = [-1, -1]
+    ax_range = [math.inf, -math.inf]
     for core_info in core_info_data:
-        if ax_range[0] == -1:
-            ax_range[0] = core_info.min
-            ax_range[1] = core_info.max
-        else:
-            ax_range[0] = min(core_info.min, ax_range[0])
-            ax_range[1] = max(core_info.max, ax_range[1])
-    
+        ax_range[0] = min(core_info.min, ax_range[0])
+        ax_range[1] = max(core_info.max, ax_range[1])
+
     for core_info in core_info_data:
-        for pid in core_info.processes:
+        print('Plotting '+core_info.core+'...')
+        for pid in tqdm(core_info.processes):
             info = core_info.processes[pid]
             
             is_core = False
@@ -147,6 +152,7 @@ def visualize_all_cores(core_info_data):
 
 
 if __name__ == '__main__':
+    # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/sample.json"
     file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/ftrace_parse_data.json"
     core_info_data = load_data(file_path)
     visualize_all_cores(core_info_data)

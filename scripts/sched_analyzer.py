@@ -1,4 +1,4 @@
-from tkinter import ON
+import matplotlib
 import numpy as np
 from parse import compile
 import copy
@@ -99,6 +99,8 @@ def update_per_process_info(cpu_info, process_name):
     return per_cpu_info, max_time
 
 if __name__ == "__main__":
+    # matplotlib.use("TkAgg")
+
     process_name = [
                 "republish",
                 "op_global_plann",
@@ -120,10 +122,10 @@ if __name__ == "__main__":
 
     file_path = os.path.dirname(os.path.realpath(__file__))[0:-7]
 
-    file = open(file_path + "/ftrace_log.txt", "r")
+    file = open(file_path + "/sample/ftrace_log.txt", "r")
 
     per_cpu_info, process_name = parse_ftrace_log(file ,process_name)
     per_cpu_info, max_time = update_per_process_info(per_cpu_info, process_name)
 
-    with open(file_path + "/ftrace_parse_data.json", "w") as json_file:
+    with open(file_path + "/sample.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
