@@ -18,7 +18,7 @@ class CoreInfo:
         pid = str(pid)
         if pid not in self.processes:
             self.processes[pid] = {'name':[], 'start':[], 'end':[], 'len':[], 'label':[]}
-        self.processes[pid]['name'].append(name)
+        self.processes[pid]['name'].append(name+'('+pid+')')
         self.processes[pid]['start'].append(start)
         self.processes[pid]['end'].append(end)
         self.processes[pid]['len'].append(end-start)
@@ -34,7 +34,6 @@ class CoreInfo:
                 cur_max = max(self.processes[pid]['end'])
                 self.min = min(cur_min, self.min)
                 self.max = max(cur_max, self.max)
-        print("!!", self.min, self.max)
 
 def load_data(data_path):
     with open(data_path) as f:
@@ -48,9 +47,9 @@ def load_data(data_path):
             
             for name in core_data:
                 for process_info in core_data[name]:                    
-                    pid = process_info[0]
-                    start = process_info[1]
-                    end = process_info[2]
+                    pid = process_info['PID']
+                    start = process_info['Start Time']
+                    end = process_info['End Time']
                     core_info.add(name, pid, start, end)
             
             core_info.update_min_max()
@@ -76,6 +75,7 @@ def visualize_all_cores(core_info_data):
     for core_info in core_info_data:
         for pid in core_info.processes:
             info = core_info.processes[pid]
+            if core_info.core != 'cpu11': continue
             
             fig.add_trace(go.Bar(
                 y=[core_info.core],
@@ -87,6 +87,9 @@ def visualize_all_cores(core_info_data):
                 orientation='h',
                 showlegend=False
             ))
+    
+    
+    print(range)
     
     fig.update_xaxes(range=range, row=1, col=1)
     
