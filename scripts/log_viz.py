@@ -10,11 +10,12 @@ from plotly.subplots import make_subplots
 
 ############### TODO ###############
 # select cores to visualize
-core_plot = [10, 11]
+core_plot = [0]
 # visualization mode ("per_thread" or "per_cpu")
 mode = 'per_cpu'
-# computtion speed ("fast" or "normal") -> normal will skip data little than 100ns
-speed = 'normal' 
+# computtion speed ("fast" or "normal") -> normal will skip data little than SKIP_THRESHOLD
+speed = 'speed'
+SKIP_THRESHOLD = 0.002
 ####################################
 
 class CoreInfo:
@@ -26,7 +27,7 @@ class CoreInfo:
         return
     
     def add(self, name, pid, start, end):
-        if speed == 'fast' and end-start < 0.001: return
+        if speed == 'fast' and end-start < SKIP_THRESHOLD: return
 
         pid = str(pid)
         if pid not in self.processes:
@@ -104,7 +105,7 @@ def visualize_all_cores(core_info_data):
             if not is_core:
                 continue
             
-            if mode == "per_cpu":
+            if mode == 'per_cpu':
                 for i in range(len(info['name'])):
                     fig.add_trace(go.Bar(
                         y=[core_info.core],
@@ -114,9 +115,9 @@ def visualize_all_cores(core_info_data):
                         hovertext=[info['label'][i]],
                         textposition='auto',
                         orientation='h',
-                        showlegend=False
+                        showlegend=False,
                     ), row=1, col=1)
-            else:
+            elif mode == 'per_thread':
                 for i in range(len(info['name'])):
                     fig.add_trace(go.Bar(
                         y=[info['name'][i]],
@@ -139,6 +140,8 @@ def visualize_all_cores(core_info_data):
             color="#7f7f7f"
         )
     )
+
+    fig.update_traces(width=3)
     
     if mode == "per_cpu":
         fig.update_xaxes(range=ax_range, row=1, col=1)
@@ -152,7 +155,7 @@ def visualize_all_cores(core_info_data):
 
 
 if __name__ == '__main__':
-    # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/sample.json"
-    file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/ftrace_parse_data.json"
+    file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/sample.json"
+    # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/ftrace_parse_data.json"
     core_info_data = load_data(file_path)
     visualize_all_cores(core_info_data)
