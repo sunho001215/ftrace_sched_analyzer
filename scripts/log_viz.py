@@ -155,7 +155,7 @@ def visualize_all_cores(core_info_data):
 
 
 if __name__ == '__main__':
-    file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/sample.json"
-    # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/ftrace_parse_data.json"
+    file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/sample.json"
+    # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/ftrace_parse_data.json"
     core_info_data = load_data(file_path)
     visualize_all_cores(core_info_data)
