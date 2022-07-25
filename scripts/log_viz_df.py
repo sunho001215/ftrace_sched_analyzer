@@ -56,7 +56,7 @@ def visualize_all_cores(sched_info_dfs):
             barmode='stack',
             font=dict(
                 family="Courier New, monospace",
-                size=18,
+                size=8,
                 color="#7f7f7f"
             )
         )
