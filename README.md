@@ -1,5 +1,6 @@
 # ftrace_sched_analyzer
 ## json file format
+- (PID, Start Time, End Time)
 ```
 .json
 └───cpu0
