@@ -1,5 +1,9 @@
 #!/bin/bash
 
+trace-cmd reset
+sleep 0.5
+echo "clear the trace buffers"
+
 echo 0 > /sys/kernel/debug/tracing/tracing_on
 sleep 0.5
 echo "tracing_off"
@@ -12,9 +16,9 @@ echo nop > /sys/kernel/debug/tracing/current_tracer
 sleep 0.5
 echo "nop tracer enabled"
 
-echo 1 > /sys/kernel/debug/tracing/events/sched/sched_wakeup/enable
+# echo 1 > /sys/kernel/debug/tracing/events/sched/sched_wakeup/enable
 echo 1 > /sys/kernel/debug/tracing/events/sched/sched_switch/enable
-echo 1 > /sys/kernel/debug/tracing/events/sched/sched_pi_setprio/enable
+# echo 1 > /sys/kernel/debug/tracing/events/sched/sched_pi_setprio/enable
 sleep 0.5
 echo "sched events enabled"
 
