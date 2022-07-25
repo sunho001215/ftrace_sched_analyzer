@@ -34,10 +34,6 @@ NEXT_COMM = 5
 NEXT_PID = 6
 NEXT_PRIO = 7
 
-#
-start_time = 0.0
-end_time = 0.0
-
 def parse_ftrace_log(file):
     func_pattern = compile("{}[{}] {}  {}: {}: {}")
     sched_switch_pattern = compile("{}[{}] {}  {}: {}: prev_comm={} prev_pid={} prev_prio={} prev_state={} ==> next_comm={} next_pid={} next_prio={}")
@@ -106,6 +102,7 @@ def update_per_process_info(cpu_info):
 
 # WORKING ON
 def sched_display(per_cpu_info, max_time):
+    start_time = 0.0
     end_time = max_time
     scale = 1000
 
