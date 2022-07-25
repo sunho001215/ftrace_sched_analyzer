@@ -1,27 +1,16 @@
+from tkinter import ON
 import numpy as np
 from parse import compile
 import copy
 import json
 import os
 
-# TODO
+############### TODO ###############
+# core number of your computer
 CPU_NUM = 12
-process_name = ["op_global_plann",
-                "op_trajectory_g",
-                "op_trajectory_e",
-                "op_behavior_sel",
-                "ray_ground_filt",
-                "lidar_euclidean",
-                "imm_ukf_pda",
-                "op_motion_predi",
-                "lidar_republish",
-                "voxel_grid_filt",
-                "ndt_matching",
-                "relay",
-                "rubis_pose_rela",
-                "pure_pursuit",
-                "twist_filter",
-                "twist_gate"]
+# analyze autoware node only
+ONLY_AUTOWARE = False
+####################################
 
 # 
 TIME = 0
@@ -33,7 +22,7 @@ NEXT_COMM = 5
 NEXT_PID = 6
 NEXT_PRIO = 7
 
-def parse_ftrace_log(file):
+def parse_ftrace_log(file, process_name):
     func_pattern = compile("{}[{}] {} {}: {}: {}")
     sched_switch_pattern = compile("{}[{}] {} {}: {}: prev_comm={} prev_pid={} prev_prio={} prev_state={} ==> next_comm={} next_pid={} next_prio={}")
 
@@ -41,6 +30,9 @@ def parse_ftrace_log(file):
     
     for i in range(CPU_NUM):
         per_cpu_info['cpu'+str(i)] = []
+
+    if not ONLY_AUTOWARE:
+        process_name = []
 
     while True:
         line = file.readline()
@@ -57,9 +49,17 @@ def parse_ftrace_log(file):
                                                                               int(sched_parse_result[7]), sched_parse_result[8], sched_parse_result[9],
                                                                               int(sched_parse_result[10]), int(sched_parse_result[11])))
 
-    return per_cpu_info
+                if not ONLY_AUTOWARE:
+                    already_exist = False
+                    for i in range(len(process_name)):
+                        if process_name[i] == sched_parse_result[5]:
+                            already_exist = True
+                    if not already_exist:
+                        process_name.append(sched_parse_result[5])
 
-def update_per_process_info(cpu_info):
+    return per_cpu_info, process_name
+
+def update_per_process_info(cpu_info, process_name):
     per_cpu_info, per_cpu_start_info = {}, {}
     per_process_info, per_process_start_info = {}, {}
 
@@ -99,12 +99,31 @@ def update_per_process_info(cpu_info):
     return per_cpu_info, max_time
 
 if __name__ == "__main__":
+    process_name = [
+                "republish",
+                "op_global_plann",
+                "op_trajectory_g",
+                "op_trajectory_e",
+                "op_behavior_sel",
+                "ray_ground_filt",
+                "lidar_euclidean",
+                "imm_ukf_pda",
+                "op_motion_predi",
+                "lidar_republish",
+                "voxel_grid_filt",
+                "ndt_matching",
+                "relay",
+                "rubis_pose_rela",
+                "pure_pursuit",
+                "twist_filter",
+                "twist_gate"]
+
     file_path = os.path.dirname(os.path.realpath(__file__))[0:-7]
 
     file = open(file_path + "/ftrace_log.txt", "r")
-    
-    per_cpu_info = parse_ftrace_log(file)
-    per_cpu_info, max_time = update_per_process_info(per_cpu_info)
+
+    per_cpu_info, process_name = parse_ftrace_log(file ,process_name)
+    per_cpu_info, max_time = update_per_process_info(per_cpu_info, process_name)
 
     with open(file_path + "/ftrace_parse_data.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
