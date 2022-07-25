@@ -35,15 +35,15 @@ NEXT_PID = 6
 NEXT_PRIO = 7
 
 def parse_ftrace_log(file):
-    func_pattern = compile("{}[{}] {}  {}: {}: {}")
-    sched_switch_pattern = compile("{}[{}] {}  {}: {}: prev_comm={} prev_pid={} prev_prio={} prev_state={} ==> next_comm={} next_pid={} next_prio={}")
+    func_pattern = compile("{}[{}] {} {}: {}: {}")
+    sched_switch_pattern = compile("{}[{}] {} {}: {}: prev_comm={} prev_pid={} prev_prio={} prev_state={} ==> next_comm={} next_pid={} next_prio={}")
 
     per_cpu_info = {}
     
     for i in range(CPU_NUM):
         per_cpu_info['cpu'+str(i)] = []
 
-    start_time = 0
+    start_time = 0.0
     update_start_time = False
     while True:
         line = file.readline()
@@ -92,46 +92,18 @@ def update_per_process_info(cpu_info):
                     if cpu_info['cpu'+str(i)][j][PREV_PID] == per_cpu_start_info['cpu'+str(i)][process_name[k]][2]:
                         if per_cpu_start_info['cpu'+str(i)][process_name[k]][0]:
                             per_cpu_start_info['cpu'+str(i)][process_name[k]][0] = False
-                            per_cpu_info['cpu' + str(i)][process_name[k]].append((per_cpu_start_info['cpu'+str(i)][process_name[k]][2],
-                                                                                  per_cpu_start_info['cpu'+str(i)][process_name[k]][1], cpu_info['cpu'+str(i)][j][TIME]))
+                            
+                            process_info = {}
+                            process_info['PID'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][2]
+                            process_info['Start Time'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][1]
+                            process_info['End Time'] = cpu_info['cpu'+str(i)][j][TIME]
+
+                            per_cpu_info['cpu' + str(i)][process_name[k]].append(process_info)
                 
                 if max_time < cpu_info['cpu'+str(i)][j][TIME]:
                     max_time = cpu_info['cpu'+str(i)][j][TIME]
 
     return per_cpu_info, max_time
-
-# WORKING ON
-def sched_display(per_cpu_info, max_time):
-    start_time = 0.0
-    end_time = max_time
-    scale = 1000
-
-    fig, ax = plt.subplots()
-    plt.subplots_adjust(left=0.25, bottom=0.25)
-
-    t = np.arange(0.0, 1.0, 0.001)
-    a0 = 5
-    f0 = 3
-    delta_f = 5.0
-    s = a0 * np.sin(2 * np.pi * f0 * t)
-    l, = plt.plot(t, s, lw=2)
-    
-    axcolor = 'lightgoldenrodyellow'
-    axStartTime = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor=axcolor)
-    axEndTime = plt.axes([0.25, 0.15, 0.65, 0.03], facecolor=axcolor)
-
-    sStartTime = Slider(axStartTime, "start time (ms)", 0.0, max_time * scale, valinit=start_time * scale, valstep=0.001)
-    sEndTime = Slider(axEndTime, "end time (ms)", 0.0, max_time * scale, valinit=end_time * scale, valstep=0.001)
-
-    def update(val):
-        start_time = sStartTime.val
-        end_time = sEndTime.val
-        print(end_time)
-
-    sStartTime.on_changed(update)
-    sEndTime.on_changed(update)
-
-    plt.show()
 
 if __name__ == "__main__":
     file = open(file_path, "r")
@@ -142,7 +114,6 @@ if __name__ == "__main__":
     with open("ftrace_parse_data.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
 
-    # sched_display(per_cpu_info, max_time)
 
 
 
