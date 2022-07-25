@@ -2,10 +2,9 @@ import numpy as np
 from parse import compile
 import copy
 import json
-
+import os
 
 # TODO
-file_path = "/home/bkpark/workspace/ftrace_sched_analyzer/ftrace_log.txt"
 CPU_NUM = 12
 process_name = ["op_global_plann",
                 "op_trajectory_g",
@@ -106,17 +105,12 @@ def update_per_process_info(cpu_info):
     return per_cpu_info, max_time
 
 if __name__ == "__main__":
-    file = open(file_path, "r")
+    file_path = os.path.dirname(os.path.realpath(__file__))[0:-7]
+
+    file = open(file_path + "/ftrace_log.txt", "r")
     
     per_cpu_info = parse_ftrace_log(file)
     per_cpu_info, max_time = update_per_process_info(per_cpu_info)
 
-    with open("ftrace_parse_data.json", "w") as json_file:
+    with open(file_path + "/ftrace_parse_data.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
-
-
-
-
-    
-    
-    
