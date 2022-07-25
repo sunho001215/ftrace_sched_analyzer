@@ -1,8 +1,8 @@
 import numpy as np
 from parse import compile
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider, Button, RadioButtons
+import copy
 import json
+
 
 # TODO
 file_path = "/home/bkpark/workspace/ftrace_sched_analyzer/ftrace_log.txt"
@@ -43,7 +43,7 @@ def parse_ftrace_log(file):
     for i in range(CPU_NUM):
         per_cpu_info['cpu'+str(i)] = []
 
-    start_time = 0.0
+    start_time = 0
     update_start_time = False
     while True:
         line = file.readline()
@@ -74,9 +74,9 @@ def update_per_process_info(cpu_info):
         per_process_info[process_name[i]] = []
         # (is_start, start_time, pid)
         per_process_start_info[process_name[i]] = [False, 0.0, 0]
-    
+
     for i in range(CPU_NUM):
-        per_cpu_info['cpu'+str(i)] = per_process_info
+        per_cpu_info['cpu'+str(i)] = copy.deepcopy(per_process_info)
         per_cpu_start_info['cpu'+str(i)] = per_process_start_info
 
     max_time = 0.0
@@ -98,7 +98,7 @@ def update_per_process_info(cpu_info):
                             process_info['Start Time'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][1]
                             process_info['End Time'] = cpu_info['cpu'+str(i)][j][TIME]
 
-                            per_cpu_info['cpu' + str(i)][process_name[k]].append(process_info)
+                            per_cpu_info['cpu'+str(i)][process_name[k]].append(process_info)
                 
                 if max_time < cpu_info['cpu'+str(i)][j][TIME]:
                     max_time = cpu_info['cpu'+str(i)][j][TIME]
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     
     per_cpu_info = parse_ftrace_log(file)
     per_cpu_info, max_time = update_per_process_info(per_cpu_info)
-    
+
     with open("ftrace_parse_data.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
 
