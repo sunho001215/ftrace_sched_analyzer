@@ -42,8 +42,6 @@ def parse_ftrace_log(file):
     for i in range(CPU_NUM):
         per_cpu_info['cpu'+str(i)] = []
 
-    start_time = 0
-    update_start_time = False
     while True:
         line = file.readline()
         if not line:
@@ -54,12 +52,8 @@ def parse_ftrace_log(file):
         if result != None:
             if result[4] == 'sched_switch':
                 sched_parse_result = sched_switch_pattern.parse(line)
-                
-                if not update_start_time:
-                    start_time = float(sched_parse_result[3])
-                    update_start_time = True
 
-                per_cpu_info['cpu' + str(int(sched_parse_result[1]))].append((float(sched_parse_result[3])-start_time, sched_parse_result[5], int(sched_parse_result[6]),
+                per_cpu_info['cpu' + str(int(sched_parse_result[1]))].append((float(sched_parse_result[3]), sched_parse_result[5], int(sched_parse_result[6]),
                                                                               int(sched_parse_result[7]), sched_parse_result[8], sched_parse_result[9],
                                                                               int(sched_parse_result[10]), int(sched_parse_result[11])))
 
