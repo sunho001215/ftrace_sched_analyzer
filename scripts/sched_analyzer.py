@@ -26,6 +26,8 @@ NEXT_COMM = 5
 NEXT_PID = 6
 NEXT_PRIO = 7
 
+#
+count_ = 0
 def parse_ftrace_log(file, process_name):
     func_pattern = compile("{}[{}] {} {}: {}: {}")
     sched_switch_pattern = compile("{}[{}] {} {}: {}: prev_comm={} prev_pid={} prev_prio={} prev_state={} ==> next_comm={} next_pid={} next_prio={}")
@@ -65,6 +67,7 @@ def parse_ftrace_log(file, process_name):
     return per_cpu_info, process_name
 
 def update_per_process_info(cpu_info, process_name):
+    global count_
     per_cpu_info, per_cpu_start_info = {}, {}
     per_process_info, per_process_start_info = {}, {}
 
@@ -92,12 +95,15 @@ def update_per_process_info(cpu_info, process_name):
                             per_cpu_start_info['cpu'+str(i)][process_name[k]][0] = False
                             
                             process_info = {}
+                            process_info['Count'] = count_
                             process_info['PID'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][2]
                             process_info['StartTime'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][1]
                             process_info['EndTime'] = cpu_info['cpu'+str(i)][j][TIME]
                             process_info['Instance'] = -1
 
                             per_cpu_info['cpu'+str(i)][process_name[k]].append(process_info)
+
+                            count_ = count_ + 1
                 
                 if max_time < cpu_info['cpu'+str(i)][j][TIME]:
                     max_time = cpu_info['cpu'+str(i)][j][TIME]
