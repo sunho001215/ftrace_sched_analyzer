@@ -15,7 +15,7 @@ import pandas as pd
 # visualization mode ("per_thread" or "per_cpu")
 mode = 'per_cpu'
 # Skip threshold (s)
-SKIP_THRESHOLD = 0.001
+SKIP_THRESHOLD = 0.0005
 # Additional features ( skip )
 features = ['skip']
 ####################################
@@ -38,8 +38,8 @@ def load_data(data_path, config_path):
                 df['Name'] = str(name) + '(' + df['PID'].astype(str) + ')'
                 df['Core'] = str(core)
                 df['Duration'] = df['EndTime'] - df['StartTime']
-                df['InstanceNumber'] = 0
                 df['StartTime'] = df['StartTime']
+                df['Instance'] = df['Instance']
                 
                 if 'skip' in features:
                     df = df[df.Duration >= SKIP_THRESHOLD]
@@ -57,7 +57,7 @@ def visualize_per_thread(sched_info_df):
     config = dict({'scrollZoom': True})
 
     for core, core_df in tqdm(sched_info_df.groupby('Core')):
-        fig = px.bar(core_df, base='StartTime', x='Duration', y='Name', color='Name')
+        fig = px.bar(core_df, base='StartTime', x='Duration', y='Name', color='Name', hover_data=['Instance'])
         
         if 'skip' in features:
             title=core+' scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
@@ -81,7 +81,7 @@ def visualize_per_thread(sched_info_df):
 def visualize_per_cpu(sched_info_df):
     config = dict({'scrollZoom': True})
     
-    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Name', text='Name', hover_data=['InstanceNumber'])
+    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Name', text='Name', hover_data=['EndTime', 'Instance'])
 
     if 'skip' in features:
         title='Scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'

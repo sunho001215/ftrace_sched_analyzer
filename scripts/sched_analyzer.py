@@ -95,6 +95,7 @@ def update_per_process_info(cpu_info, process_name):
                             process_info['PID'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][2]
                             process_info['StartTime'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][1]
                             process_info['EndTime'] = cpu_info['cpu'+str(i)][j][TIME]
+                            process_info['Instance'] = -1
 
                             per_cpu_info['cpu'+str(i)][process_name[k]].append(process_info)
                 
@@ -128,26 +129,32 @@ def get_node_instance_info(log_file):
     next(reader)
     
     node_instance_info = []
+    
     pid = -1
     start = -1
     end = -1
-    prev_instance= -1
+    instance = -1
+    prev_instance = -1
     
     for line in reader:
         if pid == -1: pid = line[1]
         cur_start = line[2]
         cur_end = line[3]
-        instance = line[4]
+        cur_instance = line[4]
         
-        if prev_instance != -1 and prev_instance !=instance:
-            node_instance_info.append({'instance':instance, 'start':float(start), 'end':float(end)})
-            start = -1
-            end = -1
+        if instance == -1:
+            start = cur_start
+            end = cur_end
+            instance = cur_instance    
         
-        if start == -1: start = cur_start
-        if end == -1 or end < cur_end: end = cur_end
+        if prev_instance != 1:        
+            if cur_instance == prev_instance:
+                end = cur_end
+            else:
+                node_instance_info.append({'instance':instance, 'start':float(start), 'end':float(end)})
+                instance = -1
         
-        prev_instance = copy.deepcopy(instance)
+        prev_instance = line[4]
     
     return pid, node_instance_info
     
@@ -162,54 +169,57 @@ def add_instance_info(per_cpu_info, autoware_log_dir):
                 
                 log_file = open(log_path)
                 pid, node_instance_info = get_node_instance_info(log_file)
-                
+
                 for sched_info in per_cpu_info[core][name]:
                     if str(sched_info['PID']) != pid: continue
                     
-                    remove_idx = -1
                     for i, instance_info in enumerate(node_instance_info):    
                         # case1:                                            
                         #     sched               |-----| 
                         #     inst    |-----|
-                        if instance_info['start'] < sched_info['StartTime'] and instance_info['end'] < sched_info['StartTime']:
-                            remove_idx = i
+                        if instance_info['start'] < sched_info['StartTime'] and instance_info['start'] < sched_info['EndTime'] \
+                            and instance_info['end'] < sched_info['StartTime'] and instance_info['end'] < sched_info['EndTime']:
                             continue
                         # case2: 
                         #     sched       |-----|
                         #     inst    |-----|
-                        elif instance_info['start'] < sched_info['StartTime'] and instance_info['end'] >= sched_info['StartTime']:
+                        elif instance_info['start'] < sched_info['StartTime'] and instance_info['start'] < sched_info['EndTime'] \
+                            and instance_info['end'] >= sched_info['StartTime'] and instance_info['end'] < sched_info['EndTime']:
                             sched_info['Instance'] = instance_info['instance']
-                            remove_idx = i
+                            sched_info['Case'] = 2
                             break
                         # case3:
                         #     sched     |-|
                         #     inst    |-----|
-                        elif instance_info['start'] < sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
+                        elif instance_info['start'] < sched_info['StartTime'] and instance_info['start'] < sched_info['EndTime'] \
+                            and instance_info['end'] >= sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
                             sched_info['Instance'] = instance_info['instance']
+                            sched_info['Case'] = 3
                             break
                         # case4:
                         #     sched   |-----|
                         #     inst      |-|
-                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['end'] < sched_info['EndTime']:
+                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['start'] < sched_info['EndTime'] \
+                            and instance_info['end'] >= sched_info['StartTime'] and instance_info['end'] < sched_info['EndTime']:
                             sched_info['Instance'] = instance_info['instance']
+                            sched_info['Case'] = 4
                             break
                         # case5:
                         #     sched   |-----|
                         #     inst        |-----|
-                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
+                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['start'] < sched_info['EndTime'] \
+                            and instance_info['end'] >= sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
                             sched_info['Instance'] = instance_info['instance']
+                            sched_info['Case'] = 5
                             break
                         # case6:  
                         #     sched   |-----|
                         #     inst                |-----|
-                        elif instance_info['start'] >= sched_info['EndTime'] and instance_info['end'] >= sched_info['EndTime']:
+                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['start'] >= sched_info['EndTime'] \
+                            and instance_info['end'] >= sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
                             sched_info['Instance'] = -1
+                            sched_info['Case'] = 6
                             break
-                        
-                    # Remove meaningless instance info
-                    if remove_idx != -1:
-                        node_instance_info[remove_idx:]
-                        remove_idx = -1
     
     return per_cpu_info
 
