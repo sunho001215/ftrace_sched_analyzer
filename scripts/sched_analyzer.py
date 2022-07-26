@@ -261,4 +261,3 @@ if __name__ == "__main__":
     filtering_option = create_filtering_option(process_name)
     with open(file_path + "/filtering_option.json", "w") as json_file:
         json.dump(filtering_option, json_file, indent=4)
-    
