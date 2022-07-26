@@ -16,10 +16,13 @@ import csv
 # visualization mode ("per_thread" or "per_cpu")
 mode = 'per_cpu'
 # Skip threshold (s)
-SKIP_THRESHOLD = 0.0005
-# Showing e2e instance
-# Additional features ( skip, e2e )
-features = ['e2e']
+SKIP_THRESHOLD = 0.000005
+
+# Additional features
+#   skip: Skip sched_info that duration is smaller than SKIP_THREASHOLD
+#   e2e: Shoe e2e instasnce range
+#   only_spin: Remove all ros thread which don't spin
+features = ['skip', 'only_spin']
 ####################################
 
 def load_data(data_path, config_path):
@@ -37,7 +40,9 @@ def load_data(data_path, config_path):
                 df = pd.json_normalize(sched_data[name])
                 if 'StartTime' not in df: continue
                 df['Core'] = core
-                df['Name'] = str(name) + '(' + df['PID'].astype(str) + ')'
+                df['PID'] = df['PID'].astype(int)
+                df['Name'] = str(name)
+                df['Label'] = str(name) + ' (' + df['PID'].astype(str) + ')'
                 df['Core'] = str(core)
                 df['Duration'] = df['EndTime'] - df['StartTime']
                 df['StartTime'] = df['StartTime']
@@ -45,7 +50,6 @@ def load_data(data_path, config_path):
                 
                 if 'skip' in features:
                     df = df[df.Duration >= SKIP_THRESHOLD]
-                
                 if df.size == 0: continue
                 
                 if sched_info_df.size == 0:
@@ -53,13 +57,27 @@ def load_data(data_path, config_path):
                 else:                    
                     sched_info_df = pd.concat([sched_info_df,df])
 
+    if 'only_spin' in features:
+        remove_target_pids=[]
+        for name, name_df in sched_info_df.groupby('Name'):
+            if name_df['PID'].unique().size <= 1: continue
+            pids = list(name_df['PID'].unique())
+            pids.sort()
+            for pid in pids[1:]: remove_target_pids.append(pid)
+
+        for pid in remove_target_pids:
+            sched_info_df = sched_info_df[sched_info_df['PID'] != pid]
+            
+            
+
+    
     return sched_info_df
 
 def visualize_per_thread(sched_info_df, e2e_response_time_path='None', e2e_instance_range=[0,0]):
     config = dict({'scrollZoom': True})
 
     for core, core_df in tqdm(sched_info_df.groupby('Core')):
-        fig = px.bar(core_df, base='StartTime', x='Duration', y='Name', color='Name', hover_data=['Instance'])
+        fig = px.bar(core_df, base='StartTime', x='Duration', y='Label', color='Label', hover_data=['Instance'])
         
         if 'skip' in features:
             title=core+' scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
@@ -86,7 +104,7 @@ def visualize_per_thread(sched_info_df, e2e_response_time_path='None', e2e_insta
 def visualize_per_cpu(sched_info_df, e2e_response_time_path='None', e2e_instance_range=[0,0]):
     config = dict({'scrollZoom': True})
     
-    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Name', text='Name', hover_data=['EndTime', 'Instance'])
+    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Label', text='Label', hover_data=['EndTime', 'Instance'])
 
     if 'skip' in features:
         title='Scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
@@ -112,7 +130,7 @@ def visualize_per_instance(sched_info_df, e2e_response_time_path='None', e2e_ins
     config = dict({'scrollZoom': True})
     
     sched_info_df = sched_info_df[sched_info_df['Instance'] != -1]
-    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Instance', text='Name', hover_data=['EndTime', 'Instance'])
+    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Instance', text='Label', hover_data=['EndTime', 'Instance'])
 
     if 'skip' in features:
         title='Scheduling per instance (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'

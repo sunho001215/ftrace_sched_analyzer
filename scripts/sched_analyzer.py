@@ -61,7 +61,7 @@ def parse_ftrace_log(file, process_name):
                     if not already_exist:
                         if not sched_parse_result[5][0:7] == "swapper":
                             process_name.append(sched_parse_result[5])
-
+    
     return per_cpu_info, process_name
 
 def update_per_process_info(cpu_info, process_name):
