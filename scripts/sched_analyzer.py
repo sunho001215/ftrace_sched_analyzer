@@ -1,9 +1,13 @@
+from cmath import log
+import sched
 import matplotlib
 import numpy as np
 from parse import compile
 import copy
 import json
 import os
+import glob
+import csv
 
 ############### TODO ###############
 # core number of your computer
@@ -113,6 +117,102 @@ def create_filtering_option(process_name):
         filtering_option[process_name[i]] = True
     return filtering_option
 
+def str_match_from_front(str1, str2):
+    for i in range(min(len(str1), len(str2))):
+        if str1[i] != str2[i]: return False
+    
+    return True
+
+def get_node_instance_info(log_file):
+    reader = csv.reader(log_file)
+    next(reader)
+    
+    node_instance_info = []
+    pid = -1
+    start = -1
+    end = -1
+    prev_instance= -1
+    
+    for line in reader:
+        if pid == -1: pid = line[1]
+        cur_start = line[2]
+        cur_end = line[3]
+        instance = line[4]
+        
+        if prev_instance != -1 and prev_instance !=instance:
+            node_instance_info.append({'instance':instance, 'start':float(start), 'end':float(end)})
+            start = -1
+            end = -1
+        
+        if start == -1: start = cur_start
+        if end == -1 or end < cur_end: end = cur_end
+        
+        prev_instance = copy.deepcopy(instance)
+    
+    return pid, node_instance_info
+    
+
+def add_instance_info(per_cpu_info, autoware_log_dir):
+    for log_path in glob.glob(os.path.join(autoware_log_dir, '*.csv')):
+        node_name = log_path.split('/')[-1].split('.')[0]
+        
+        for core in per_cpu_info:
+            for name in per_cpu_info[core]:
+                if not str_match_from_front(name, node_name): continue
+                
+                log_file = open(log_path)
+                pid, node_instance_info = get_node_instance_info(log_file)
+                
+                for sched_info in per_cpu_info[core][name]:
+                    if str(sched_info['PID']) != pid: continue
+                    
+                    remove_idx = -1
+                    for i, instance_info in enumerate(node_instance_info):    
+                        # case1:                                            
+                        #     sched               |-----| 
+                        #     inst    |-----|
+                        if instance_info['start'] < sched_info['StartTime'] and instance_info['end'] < sched_info['StartTime']:
+                            remove_idx = i
+                            continue
+                        # case2: 
+                        #     sched       |-----|
+                        #     inst    |-----|
+                        elif instance_info['start'] < sched_info['StartTime'] and instance_info['end'] >= sched_info['StartTime']:
+                            sched_info['Instance'] = instance_info['instance']
+                            remove_idx = i
+                            break
+                        # case3:
+                        #     sched     |-|
+                        #     inst    |-----|
+                        elif instance_info['start'] < sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
+                            sched_info['Instance'] = instance_info['instance']
+                            break
+                        # case4:
+                        #     sched   |-----|
+                        #     inst      |-|
+                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['end'] < sched_info['EndTime']:
+                            sched_info['Instance'] = instance_info['instance']
+                            break
+                        # case5:
+                        #     sched   |-----|
+                        #     inst        |-----|
+                        elif instance_info['start'] >= sched_info['StartTime'] and instance_info['end'] >= sched_info['EndTime']:
+                            sched_info['Instance'] = instance_info['instance']
+                            break
+                        # case6:  
+                        #     sched   |-----|
+                        #     inst                |-----|
+                        elif instance_info['start'] >= sched_info['EndTime'] and instance_info['end'] >= sched_info['EndTime']:
+                            sched_info['Instance'] = -1
+                            break
+                        
+                    # Remove meaningless instance info
+                    if remove_idx != -1:
+                        node_instance_info[remove_idx:]
+                        remove_idx = -1
+    
+    return per_cpu_info
+
 if __name__ == "__main__":
     # matplotlib.use("TkAgg")
 
@@ -137,11 +237,13 @@ if __name__ == "__main__":
 
     file_path = os.path.dirname(os.path.realpath(__file__))[0:-7]
 
-    file = open(file_path + "/sample/ftrace_log.txt", "r")
+    file = open(file_path + "/sample/sample.txt", "r")
+    autoware_log_dir = file_path + 'data/sample_autoware_log'
 
     per_cpu_info, process_name = parse_ftrace_log(file ,process_name)
     per_cpu_info, max_time = update_per_process_info(per_cpu_info, process_name)
     per_cpu_info = filtering_process_info(per_cpu_info)
+    per_cpu_info = add_instance_info(per_cpu_info, autoware_log_dir)
 
     with open(file_path + "/data/sample.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
