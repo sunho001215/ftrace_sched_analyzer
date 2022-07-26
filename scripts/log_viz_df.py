@@ -10,7 +10,11 @@ import pandas as pd
 
 ############### TODO ###############
 # visualization mode ("per_thread" or "per_cpu")
-mode = 'per_thread'
+mode = 'per_cpu'
+# Skip threshold (s)
+SKIP_THRESHOLD = 0.001
+# Additional features ( skip )
+features = ['skip']
 ####################################
 
 def load_data(data_path):
@@ -25,11 +29,17 @@ def load_data(data_path):
             for name in sched_data:
                 df = pd.json_normalize(sched_data[name])
                 if 'Start Time' not in df: continue
-                df['Name'] = str(name)
+                df['Name'] = str(name) + '(' + df['PID'].astype(str) + ')'
                 df['Core'] = str(core)
                 df['Duration'] = df['End Time'] - df['Start Time']
-                df['Label'] = df['Name'] + '(' + df['PID'].astype(str) + ')'
+                df['Label'] = 'Duration(ms): ' + str(df['Duration']*1000)
                 df['StartTime'] = df['Start Time']
+                
+                if 'skip' in features:
+                    df = df[df.Duration >= SKIP_THRESHOLD]
+                
+                if df.size == 0: continue
+                
                 if core not in sched_info_dfs:
                     sched_info_dfs[core] = df
                 else:                    
@@ -37,7 +47,7 @@ def load_data(data_path):
 
     return sched_info_dfs
 
-def visualize_all_cores_per_thread(sched_info_dfs):
+def visualize_per_thread(sched_info_dfs):
     config = dict({'scrollZoom': True})
 
     fig = go.Figure(
@@ -50,14 +60,19 @@ def visualize_all_cores_per_thread(sched_info_dfs):
     for core in sched_info_dfs:
         for pid, pid_df in tqdm(sched_info_dfs[core].groupby('PID')): 
             fig.add_bar(x=pid_df.Duration,
-                y=pid_df.Label,
-                base=pid_df.StartTime,
-                orientation='h',
-                showlegend=False,
-                name=pid)
+                        y=pid_df.Name,
+                        base=pid_df.StartTime,
+                        orientation='h',
+                        showlegend=False,
+                        name=pid)
 
+        if 'skip' in features:
+            title=core+' scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
+        else:
+            title=core+' scheduling'
+        
         fig.update_layout(
-            title=core+" scheduling",
+            title=title,
             xaxis_title="time (s)",
             barmode='stack',
             font=dict(
@@ -72,7 +87,7 @@ def visualize_all_cores_per_thread(sched_info_dfs):
     
     return
 
-def visualize_all_cores_per_cpu(sched_info_dfs):
+def visualize_per_cpu(sched_info_dfs):
     config = dict({'scrollZoom': True})
 
     fig = go.Figure(
@@ -89,11 +104,16 @@ def visualize_all_cores_per_cpu(sched_info_dfs):
                     base=df.StartTime,
                     orientation='h',
                     showlegend=False,
-                    text=df.Label
+                    text=df.Name
                     )
-
+        
+        if 'skip' in features:
+            title='Scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
+        else:
+            title='Scheduling'
+            
         fig.update_layout(
-            title="All scheduling",
+            title=title,
             xaxis_title="time (s)",
             barmode='stack',
             font=dict(
@@ -108,6 +128,6 @@ if __name__ == '__main__':
     # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/ftrace_parse_data.json"
     sched_info_dfs = load_data(file_path)
     if mode == 'per_thread':
-        visualize_all_cores_per_thread(sched_info_dfs)
+        visualize_per_thread(sched_info_dfs)
     elif mode == 'per_cpu':
-        visualize_all_cores_per_cpu(sched_info_dfs)
+        visualize_per_cpu(sched_info_dfs)
