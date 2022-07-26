@@ -13,7 +13,7 @@ import pandas as pd
 
 ############### TODO ###############
 # visualization mode ("per_thread" or "per_cpu")
-mode = 'per_thread'
+mode = 'per_cpu'
 # Skip threshold (s)
 SKIP_THRESHOLD = 0.001
 # Additional features ( skip )
@@ -38,9 +38,8 @@ def load_data(data_path, config_path):
                 df['Name'] = str(name) + '(' + df['PID'].astype(str) + ')'
                 df['Core'] = str(core)
                 df['Duration'] = df['EndTime'] - df['StartTime']
-                df['Label'] = 'Duration(ms): ' + str(df['Duration']*1000)
+                df['InstanceNumber'] = 0
                 df['StartTime'] = df['StartTime']
-                
                 
                 if 'skip' in features:
                     df = df[df.Duration >= SKIP_THRESHOLD]
@@ -82,8 +81,7 @@ def visualize_per_thread(sched_info_df):
 def visualize_per_cpu(sched_info_df):
     config = dict({'scrollZoom': True})
     
-    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Name', text='Name')
-
+    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Name', text='Name', hover_data=['InstanceNumber'])
 
     if 'skip' in features:
         title='Scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
