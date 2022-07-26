@@ -13,7 +13,7 @@ import pandas as pd
 
 ############### TODO ###############
 # visualization mode ("per_thread" or "per_cpu")
-mode = 'per_cpu'
+mode = 'per_instance'
 # Skip threshold (s)
 SKIP_THRESHOLD = 0.0005
 # Additional features ( skip )
@@ -99,6 +99,29 @@ def visualize_per_cpu(sched_info_df):
     )
             
     fig.show()
+    
+def visualize_per_instance(sched_info_df):
+    config = dict({'scrollZoom': True})
+    
+    sched_info_df = sched_info_df[sched_info_df['Instance'] != -1]
+    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Instance', text='Name', hover_data=['EndTime', 'Instance'])
+
+    if 'skip' in features:
+        title='Scheduling per instance (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
+    else:
+        title='Scheduling per instance'
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title="time (s)",
+        barmode='stack',
+        font=dict(
+            family="Courier New, monospace",
+            color="#7f7f7f"
+        )
+    )
+            
+    fig.show()
 
 if __name__ == '__main__':
     data_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/sample.json"
@@ -110,3 +133,5 @@ if __name__ == '__main__':
         visualize_per_thread(sched_info_df)
     elif mode == 'per_cpu':
         visualize_per_cpu(sched_info_df)
+    elif mode == 'per_instance':
+        visualize_per_instance(sched_info_df)
