@@ -7,7 +7,7 @@ import os
 
 ############### TODO ###############
 # core number of your computer
-CPU_NUM = 12
+CPU_NUM = 4
 # analyze autoware node only
 ONLY_AUTOWARE = False
 ####################################
@@ -55,7 +55,8 @@ def parse_ftrace_log(file, process_name):
                         if process_name[i] == sched_parse_result[5]:
                             already_exist = True
                     if not already_exist:
-                        process_name.append(sched_parse_result[5])
+                        if not sched_parse_result[5][0:7] == "swapper":
+                            process_name.append(sched_parse_result[5])
 
     return per_cpu_info, process_name
 
@@ -88,8 +89,8 @@ def update_per_process_info(cpu_info, process_name):
                             
                             process_info = {}
                             process_info['PID'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][2]
-                            process_info['Start Time'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][1]
-                            process_info['End Time'] = cpu_info['cpu'+str(i)][j][TIME]
+                            process_info['StartTime'] = per_cpu_start_info['cpu'+str(i)][process_name[k]][1]
+                            process_info['EndTime'] = cpu_info['cpu'+str(i)][j][TIME]
 
                             per_cpu_info['cpu'+str(i)][process_name[k]].append(process_info)
                 
@@ -97,6 +98,20 @@ def update_per_process_info(cpu_info, process_name):
                     max_time = cpu_info['cpu'+str(i)][j][TIME]
 
     return per_cpu_info, max_time
+
+def filtering_process_info(per_cpu_info):
+    for i in range(CPU_NUM):
+        for j in range(len(process_name)):
+            if len(per_cpu_info['cpu'+str(i)][process_name[j]]) == 0:
+                per_cpu_info['cpu'+str(i)].pop(process_name[j])
+    
+    return per_cpu_info
+
+def create_filtering_option(process_name):
+    filtering_option = {}
+    for i in range(len(process_name)):
+        filtering_option[process_name[i]] = True
+    return filtering_option
 
 if __name__ == "__main__":
     # matplotlib.use("TkAgg")
@@ -126,6 +141,12 @@ if __name__ == "__main__":
 
     per_cpu_info, process_name = parse_ftrace_log(file ,process_name)
     per_cpu_info, max_time = update_per_process_info(per_cpu_info, process_name)
+    per_cpu_info = filtering_process_info(per_cpu_info)
 
-    with open(file_path + "/sample.json", "w") as json_file:
+    with open(file_path + "/data/sample.json", "w") as json_file:
         json.dump(per_cpu_info, json_file, indent=4)
+    
+    filtering_option = create_filtering_option(process_name)
+    with open(file_path + "/filtering_option.json", "w") as json_file:
+        json.dump(filtering_option, json_file, indent=4)
+    

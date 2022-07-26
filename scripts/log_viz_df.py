@@ -1,4 +1,5 @@
 import argparse
+from distutils.command.config import config
 import os
 import json
 import plotly.graph_objects as go
@@ -13,23 +14,27 @@ import pandas as pd
 mode = 'per_thread'
 ####################################
 
-def load_data(data_path):
+def load_data(data_path, config_path):
+    with open(config_path) as f:
+        config_data = json.load(f)
+
     with open(data_path) as f:
         raw_data = json.load(f)
-        cores = list(raw_data.keys())
+    cores = list(raw_data.keys())
         
-        sched_info_dfs = {}
-        for _, core in enumerate(cores):
-            sched_data = raw_data[core]
+    sched_info_dfs = {}
+    for _, core in enumerate(cores):
+        sched_data = raw_data[core]
 
-            for name in sched_data:
+        for name in sched_data:
+            if config_data[name]:
                 df = pd.json_normalize(sched_data[name])
-                if 'Start Time' not in df: continue
+                if 'StartTime' not in df: continue
                 df['Name'] = str(name)
                 df['Core'] = str(core)
-                df['Duration'] = df['End Time'] - df['Start Time']
+                df['Duration'] = df['EndTime'] - df['StartTime']
                 df['Label'] = df['Name'] + '(' + df['PID'].astype(str) + ')'
-                df['StartTime'] = df['Start Time']
+                df['StartTime'] = df['StartTime']
                 if core not in sched_info_dfs:
                     sched_info_dfs[core] = df
                 else:                    
@@ -104,9 +109,11 @@ def visualize_all_cores_per_cpu(sched_info_dfs):
     fig.show()
 
 if __name__ == '__main__':
-    file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/sample.json"
-    # file_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/ftrace_parse_data.json"
-    sched_info_dfs = load_data(file_path)
+    data_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/sample.json"
+    # data_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/ftrace_parse_data.json"
+    config_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/filtering_option.json"
+
+    sched_info_dfs = load_data(data_path, config_path)
     if mode == 'per_thread':
         visualize_all_cores_per_thread(sched_info_dfs)
     elif mode == 'per_cpu':
