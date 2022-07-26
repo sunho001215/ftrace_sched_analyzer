@@ -2,67 +2,71 @@ import argparse
 from distutils.command.config import config
 import os
 import json
+import sched
 import plotly.graph_objects as go
 import numpy as np
 import math
 from tqdm import tqdm
 from plotly.subplots import make_subplots
+import plotly.express as px
 import pandas as pd
 
 ############### TODO ###############
 # visualization mode ("per_thread" or "per_cpu")
 mode = 'per_thread'
+# Skip threshold (s)
+SKIP_THRESHOLD = 0.001
+# Additional features ( skip )
+features = ['skip']
 ####################################
 
 def load_data(data_path, config_path):
+    sched_info_df = pd.DataFrame()
     with open(config_path) as f:
         config_data = json.load(f)
-
     with open(data_path) as f:
         raw_data = json.load(f)
     cores = list(raw_data.keys())
         
-    sched_info_dfs = {}
     for _, core in enumerate(cores):
         sched_data = raw_data[core]
-
         for name in sched_data:
             if config_data[name]:
                 df = pd.json_normalize(sched_data[name])
                 if 'StartTime' not in df: continue
-                df['Name'] = str(name)
+                df['Core'] = core
+                df['Name'] = str(name) + '(' + df['PID'].astype(str) + ')'
                 df['Core'] = str(core)
                 df['Duration'] = df['EndTime'] - df['StartTime']
-                df['Label'] = df['Name'] + '(' + df['PID'].astype(str) + ')'
+                df['Label'] = 'Duration(ms): ' + str(df['Duration']*1000)
                 df['StartTime'] = df['StartTime']
-                if core not in sched_info_dfs:
-                    sched_info_dfs[core] = df
+                
+                
+                if 'skip' in features:
+                    df = df[df.Duration >= SKIP_THRESHOLD]
+                
+                if df.size == 0: continue
+                
+                if sched_info_df.size == 0:
+                    sched_info_df = df
                 else:                    
-                    sched_info_dfs[core] = pd.concat([sched_info_dfs[core],df])
+                    sched_info_df = pd.concat([sched_info_df,df])
 
-    return sched_info_dfs
+    return sched_info_df
 
-def visualize_all_cores_per_thread(sched_info_dfs):
+def visualize_per_thread(sched_info_df):
     config = dict({'scrollZoom': True})
 
-    fig = go.Figure(
-    layout = {
-        'barmode': 'stack',
-        'xaxis': {'automargin': True},
-        'yaxis': {'automargin': True}}#, 'categoryorder': 'category ascending'}}
-    )
-
-    for core in sched_info_dfs:
-        for pid, pid_df in tqdm(sched_info_dfs[core].groupby('PID')): 
-            fig.add_bar(x=pid_df.Duration,
-                y=pid_df.Label,
-                base=pid_df.StartTime,
-                orientation='h',
-                showlegend=False,
-                name=pid)
-
+    for core, core_df in tqdm(sched_info_df.groupby('Core')):
+        fig = px.bar(core_df, base='StartTime', x='Duration', y='Name', color='Name')
+        
+        if 'skip' in features:
+            title=core+' scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
+        else:
+            title=core+' scheduling'
+        
         fig.update_layout(
-            title=core+" scheduling",
+            title=title,
             xaxis_title="time (s)",
             barmode='stack',
             font=dict(
@@ -71,41 +75,31 @@ def visualize_all_cores_per_thread(sched_info_dfs):
                 color="#7f7f7f"
             )
         )
-
         fig.show()
-    
-    
+        
     return
 
-def visualize_all_cores_per_cpu(sched_info_dfs):
+def visualize_per_cpu(sched_info_df):
     config = dict({'scrollZoom': True})
+    
+    fig = px.bar(sched_info_df, base='StartTime', x='Duration', y='Core', color='Name', text='Name')
 
-    fig = go.Figure(
-    layout = {
-        'barmode': 'stack',
-        'xaxis': {'automargin': True},
-        'yaxis': {'automargin': True}}#, 'categoryorder': 'category ascending'}}
-    )
 
-    for core in sched_info_dfs:
-        df = sched_info_dfs[core]
-        fig.add_bar(x=df.Duration,
-                    y=df.Core,
-                    base=df.StartTime,
-                    orientation='h',
-                    showlegend=False,
-                    text=df.Label
-                    )
-
-        fig.update_layout(
-            title="All scheduling",
-            xaxis_title="time (s)",
-            barmode='stack',
-            font=dict(
-                family="Courier New, monospace",
-                color="#7f7f7f"
-            )
+    if 'skip' in features:
+        title='Scheduling (Skip threshold: '+str(SKIP_THRESHOLD*1000)+'ms)'
+    else:
+        title='Scheduling'
+    
+    fig.update_layout(
+        title=title,
+        xaxis_title="time (s)",
+        barmode='stack',
+        font=dict(
+            family="Courier New, monospace",
+            color="#7f7f7f"
         )
+    )
+            
     fig.show()
 
 if __name__ == '__main__':
@@ -113,8 +107,8 @@ if __name__ == '__main__':
     # data_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/data/ftrace_parse_data.json"
     config_path = os.path.dirname(os.path.realpath(__file__))[0:-7] + "/filtering_option.json"
 
-    sched_info_dfs = load_data(data_path, config_path)
+    sched_info_df = load_data(data_path, config_path)
     if mode == 'per_thread':
-        visualize_all_cores_per_thread(sched_info_dfs)
+        visualize_per_thread(sched_info_df)
     elif mode == 'per_cpu':
-        visualize_all_cores_per_cpu(sched_info_dfs)
+        visualize_per_cpu(sched_info_df)
